@@ -20,6 +20,7 @@ pub struct InheritanceTab {
     inheritance_chain: Vec<String>,
     settings: Arc<Mutex<AppSettings>>,
     initialized: bool,
+    auto_scanned: bool,    // 記錄是否已自動掃描
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +58,7 @@ impl InheritanceTab {
             inheritance_chain: Vec::new(),
             settings,
             initialized: false,
+            auto_scanned: false,
         }
     }
 
@@ -66,7 +68,14 @@ impl InheritanceTab {
             if settings.base_path != self.base_directory {
                 self.base_directory = settings.base_path.clone();
                 self.initialized = true;
+                self.auto_scanned = false;  // 重置自動掃描標記
             }
+        }
+
+        // 首次進入且有目錄時自動掃描
+        if !self.auto_scanned && !self.base_directory.is_empty() && self.all_defs.is_empty() {
+            self.auto_scanned = true;
+            self.scan_all_defs();
         }
 
         // 頂部控制面板
@@ -108,6 +117,8 @@ impl InheritanceTab {
                             self.inheritance_chain.clear();
                         }
                     });
+
+                    ui.separator();
 
                     egui::ScrollArea::vertical()
                         .id_salt("def_list")

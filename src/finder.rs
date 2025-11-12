@@ -187,7 +187,7 @@ impl TagFinderTab {
         ui.separator();
 
         ui.horizontal(|ui| {
-            ui.label("🔍 搜尋 標籤名稱:");
+            ui.label("🔍");
             let response = ui.text_edit_singleline(&mut self.tag_name);
 
             // 檢測輸入變化

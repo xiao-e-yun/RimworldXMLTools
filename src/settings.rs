@@ -71,7 +71,7 @@ impl SettingsTab {
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
-        ui.heading("⚙️ 路徑設置");
+        ui.heading("🔧 路徑設置");
         ui.separator();
 
         ui.label("在此處設置統一的工作目錄路徑。所有功能將使用此路徑作為基礎目錄。");
@@ -83,7 +83,7 @@ impl SettingsTab {
         // 統一的基礎路徑
         ui.group(|ui| {
             ui.horizontal(|ui| {
-                ui.label("� 工作目錄:");
+                ui.label("工作目錄:");
             });
             
             ui.horizontal(|ui| {
@@ -129,15 +129,5 @@ impl SettingsTab {
         if let Ok(config_path) = AppSettings::config_path() {
             ui.label(format!("💾 設置檔案: {}", config_path.display()));
         }
-        
-        ui.add_space(10.0);
-        
-        // 說明資訊
-        ui.group(|ui| {
-            ui.label("ℹ️ 使用說明:");
-            ui.label("• 設置的路徑會在切換到各個分頁時自動載入");
-            ui.label("• 在各分頁中選擇新目錄會自動更新此設置");
-            ui.label("• 建議選擇 RimWorld 的 Data 資料夾");
-        });
     }
 }

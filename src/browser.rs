@@ -18,6 +18,8 @@ pub struct DefBrowserTab {
     status_message: String,
     settings: Arc<Mutex<AppSettings>>,
     initialized: bool,
+    search_query: String,  // 添加搜索字段
+    auto_scanned: bool,    // 記錄是否已自動掃描
 }
 
 #[derive(Debug, Clone)]
@@ -39,6 +41,8 @@ impl DefBrowserTab {
             status_message: String::new(),
             settings,
             initialized: false,
+            search_query: String::new(),
+            auto_scanned: false,
         }
     }
 
@@ -48,7 +52,14 @@ impl DefBrowserTab {
             if settings.base_path != self.base_directory {
                 self.base_directory = settings.base_path.clone();
                 self.initialized = true;
+                self.auto_scanned = false;  // 重置自動掃描標記
             }
+        }
+
+        // 首次進入且有目錄時自動掃描
+        if !self.auto_scanned && !self.base_directory.is_empty() && self.defs.is_empty() {
+            self.auto_scanned = true;
+            self.scan_defs();
         }
 
         // 頂部控制面板
@@ -87,7 +98,14 @@ impl DefBrowserTab {
                 egui::vec2(width, ui.available_height()),
                 egui::Layout::top_down(egui::Align::Min),
                 |ui| {
-                    ui.heading("Def 類型");
+                    ui.horizontal(|ui| {
+                        ui.label("🔍");
+                        let response = ui.text_edit_singleline(&mut self.search_query);
+                        if response.changed() {
+                            self.selected_def_type = None;
+                            self.selected_def_entry = None;
+                        }
+                    });
                     ui.separator();
 
                     egui::ScrollArea::vertical()
@@ -95,10 +113,34 @@ impl DefBrowserTab {
                         .auto_shrink([false; 2])
                         .show(ui, |ui| {
                             for (def_type, entries) in &self.defs {
+                                // 檢查 Def 類型或條目名稱是否符合搜索
+                                let type_matches = def_type.to_lowercase().contains(&self.search_query.to_lowercase());
+                                let has_matching_entries = if self.search_query.is_empty() {
+                                    true
+                                } else {
+                                    type_matches || entries.iter().any(|e| 
+                                        e.def_name.to_lowercase().contains(&self.search_query.to_lowercase())
+                                    )
+                                };
+
+                                // 只顯示有符合搜索條目的 Def 類型
+                                if !has_matching_entries {
+                                    continue;
+                                }
+
                                 let is_selected = self.selected_def_type.as_ref() == Some(def_type);
+                                
+                                // 計算要顯示的條目數量
+                                let entry_count = if self.search_query.is_empty() || type_matches {
+                                    entries.len()
+                                } else {
+                                    entries.iter().filter(|e| 
+                                        e.def_name.to_lowercase().contains(&self.search_query.to_lowercase())
+                                    ).count()
+                                };
 
                                 if ui
-                                    .selectable_label(is_selected, format!("[{}]", def_type))
+                                    .selectable_label(is_selected, format!("{} ({})", def_type, entry_count))
                                     .clicked()
                                 {
                                     if is_selected {
@@ -116,6 +158,13 @@ impl DefBrowserTab {
                                 if is_selected {
                                     ui.indent(format!("indent_{}", def_type), |ui| {
                                         for (idx, entry) in entries.iter().enumerate() {
+                                            // 如果 Def 類型本身符合搜索，顯示所有條目；否則只顯示符合搜索的條目
+                                            if !self.search_query.is_empty() 
+                                                && !type_matches
+                                                && !entry.def_name.to_lowercase().contains(&self.search_query.to_lowercase()) {
+                                                continue;
+                                            }
+
                                             let entry_selected =
                                                 self.selected_def_entry == Some(idx);
                                             if ui

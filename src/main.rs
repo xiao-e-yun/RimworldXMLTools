@@ -104,7 +104,6 @@ struct XmlToolsApp {
     browser: DefBrowserTab,
     inheritance: InheritanceTab,
     settings_tab: SettingsTab,
-    settings: Arc<Mutex<AppSettings>>,
     active_tab: usize,
 }
 
@@ -116,7 +115,6 @@ impl Default for XmlToolsApp {
             browser: DefBrowserTab::new(settings.clone()),
             inheritance: InheritanceTab::new(settings.clone()),
             settings_tab: SettingsTab::new(settings.clone()),
-            settings,
             active_tab: 0,
         }
     }
@@ -129,10 +127,7 @@ impl eframe::App for XmlToolsApp {
                 ui.selectable_value(&mut self.active_tab, 0, "📚 Def 瀏覽器");
                 ui.selectable_value(&mut self.active_tab, 1, "🔗 展開繼承");
                 ui.selectable_value(&mut self.active_tab, 2, "🔍 標籤查找器");
-                ui.selectable_value(&mut self.active_tab, 3, "⚙️ 設置");
-                // 未來可以添加更多分頁
-                // ui.selectable_value(&mut self.active_tab, 4, "📊 統計分析");
-                // ui.selectable_value(&mut self.active_tab, 5, "🔧 工具箱");
+                ui.selectable_value(&mut self.active_tab, 3, "🔧 設置");
             });
         });
 
@@ -142,9 +137,6 @@ impl eframe::App for XmlToolsApp {
                 1 => self.inheritance.ui(ui, ctx),
                 2 => self.finder.ui(ui, ctx),
                 3 => self.settings_tab.ui(ui, ctx),
-                // 未來可以添加更多分頁處理
-                // 4 => self.statistics.ui(ui, ctx),
-                // 5 => self.toolbox.ui(ui, ctx),
                 _ => {
                     ui.heading("未實現的功能");
                 }
