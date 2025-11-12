@@ -4,11 +4,14 @@ mod xml_parser;
 mod browser;
 mod finder;
 mod inheritance;
+mod settings;
 
 use eframe::egui;
 use finder::TagFinderTab;
 use browser::DefBrowserTab;
 use inheritance::InheritanceTab;
+use settings::{AppSettings, SettingsTab};
+use std::sync::{Arc, Mutex};
 
 fn main() -> eframe::Result {
     // 載入圖標
@@ -96,12 +99,27 @@ fn setup_custom_fonts(ctx: &egui::Context) {
     ctx.set_fonts(fonts);
 }
 
-#[derive(Default)]
 struct XmlToolsApp {
     finder: TagFinderTab,
     browser: DefBrowserTab,
     inheritance: InheritanceTab,
+    settings_tab: SettingsTab,
+    settings: Arc<Mutex<AppSettings>>,
     active_tab: usize,
+}
+
+impl Default for XmlToolsApp {
+    fn default() -> Self {
+        let settings = Arc::new(Mutex::new(AppSettings::load()));
+        Self {
+            finder: TagFinderTab::new(settings.clone()),
+            browser: DefBrowserTab::new(settings.clone()),
+            inheritance: InheritanceTab::new(settings.clone()),
+            settings_tab: SettingsTab::new(settings.clone()),
+            settings,
+            active_tab: 0,
+        }
+    }
 }
 
 impl eframe::App for XmlToolsApp {
@@ -111,9 +129,10 @@ impl eframe::App for XmlToolsApp {
                 ui.selectable_value(&mut self.active_tab, 0, "📚 Def 瀏覽器");
                 ui.selectable_value(&mut self.active_tab, 1, "🔗 展開繼承");
                 ui.selectable_value(&mut self.active_tab, 2, "🔍 標籤查找器");
+                ui.selectable_value(&mut self.active_tab, 3, "⚙️ 設置");
                 // 未來可以添加更多分頁
-                // ui.selectable_value(&mut self.active_tab, 3, "📊 統計分析");
-                // ui.selectable_value(&mut self.active_tab, 4, "🔧 工具箱");
+                // ui.selectable_value(&mut self.active_tab, 4, "📊 統計分析");
+                // ui.selectable_value(&mut self.active_tab, 5, "🔧 工具箱");
             });
         });
 
@@ -122,9 +141,10 @@ impl eframe::App for XmlToolsApp {
                 0 => self.browser.ui(ui, ctx),
                 1 => self.inheritance.ui(ui, ctx),
                 2 => self.finder.ui(ui, ctx),
+                3 => self.settings_tab.ui(ui, ctx),
                 // 未來可以添加更多分頁處理
-                // 3 => self.statistics.ui(ui, ctx),
-                // 4 => self.toolbox.ui(ui, ctx),
+                // 4 => self.statistics.ui(ui, ctx),
+                // 5 => self.toolbox.ui(ui, ctx),
                 _ => {
                     ui.heading("未實現的功能");
                 }

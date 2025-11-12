@@ -5,9 +5,10 @@ use rayon::prelude::*;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use walkdir::WalkDir;
+use crate::settings::AppSettings;
 
-#[derive(Default)]
 pub struct DefBrowserTab {
     base_directory: String,
     defs: BTreeMap<String, Vec<DefEntry>>, // DefType -> List of entries
@@ -15,6 +16,8 @@ pub struct DefBrowserTab {
     selected_def_entry: Option<usize>,
     is_loading: bool,
     status_message: String,
+    settings: Arc<Mutex<AppSettings>>,
+    initialized: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -26,19 +29,32 @@ struct DefEntry {
 }
 
 impl DefBrowserTab {
+    pub fn new(settings: Arc<Mutex<AppSettings>>) -> Self {
+        Self {
+            base_directory: String::new(),
+            defs: BTreeMap::new(),
+            selected_def_type: None,
+            selected_def_entry: None,
+            is_loading: false,
+            status_message: String::new(),
+            settings,
+            initialized: false,
+        }
+    }
+
     pub fn ui(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
+        // 每次更新時檢查設置是否變更
+        if let Ok(settings) = self.settings.lock() {
+            if settings.base_path != self.base_directory {
+                self.base_directory = settings.base_path.clone();
+                self.initialized = true;
+            }
+        }
+
         // 頂部控制面板
         ui.horizontal(|ui| {
             ui.label("目錄:");
-            ui.text_edit_singleline(&mut self.base_directory);
-
-            if ui.button("📂 選擇目錄").clicked() {
-                if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                    self.base_directory = path.display().to_string();
-                    // 選擇目錄後自動掃描
-                    self.scan_defs();
-                }
-            }
+            ui.add_enabled(false, egui::TextEdit::singleline(&mut self.base_directory));
 
             if ui.button("🔄 掃描 Defs").clicked() && !self.base_directory.is_empty() {
                 self.scan_defs();

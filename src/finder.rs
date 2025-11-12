@@ -8,6 +8,7 @@ use std::sync::{
 };
 use walkdir::WalkDir;
 
+use crate::settings::AppSettings;
 use crate::xml_parser::extract_tag_values;
 
 pub struct SearchResult {
@@ -15,7 +16,6 @@ pub struct SearchResult {
     pub xml_count: usize,
 }
 
-#[derive(Default)]
 pub struct TagFinderTab {
     tag_name: String,
     search_path: String,
@@ -26,9 +26,27 @@ pub struct TagFinderTab {
     last_search_path: String,
     search_results: Arc<Mutex<Option<SearchResult>>>,
     cancel_flag: Arc<AtomicBool>,
+    settings: Arc<Mutex<AppSettings>>,
+    initialized: bool,
 }
 
 impl TagFinderTab {
+    pub fn new(settings: Arc<Mutex<AppSettings>>) -> Self {
+        Self {
+            tag_name: String::new(),
+            search_path: String::new(),
+            results: Vec::new(),
+            status_message: String::new(),
+            is_searching: false,
+            last_tag_name: String::new(),
+            last_search_path: String::new(),
+            search_results: Arc::new(Mutex::new(None)),
+            cancel_flag: Arc::new(AtomicBool::new(false)),
+            settings,
+            initialized: false,
+        }
+    }
+
     pub fn search_xml_files(&mut self, ctx: egui::Context) {
         // 取消之前的搜尋
         self.cancel_flag.store(true, Ordering::Relaxed);
@@ -124,6 +142,25 @@ impl TagFinderTab {
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        // 每次更新時檢查設置是否變更
+        let mut should_search = false;
+        if let Ok(settings) = self.settings.lock() {
+            if settings.base_path != self.search_path {
+                self.search_path = settings.base_path.clone();
+                self.last_search_path = self.search_path.clone();
+                self.initialized = true;
+                // 如果有標籤名稱,標記需要重新搜尋
+                if !self.tag_name.is_empty() && !self.search_path.is_empty() {
+                    should_search = true;
+                }
+            }
+        }
+        
+        // 在鎖釋放後執行搜尋
+        if should_search {
+            self.search_xml_files(ctx.clone());
+        }
+
         // 檢查後台搜尋結果
         self.check_search_results();
 
@@ -131,24 +168,8 @@ impl TagFinderTab {
         ui.horizontal(|ui| {
             ui.label("目錄:");
             
-            // 檢測輸入變化
-            let response = ui.text_edit_singleline(&mut self.search_path);
-            if response.changed() && self.search_path != self.last_search_path {
-                self.last_search_path = self.search_path.clone();
-                if !self.tag_name.is_empty() && !self.search_path.is_empty() {
-                    self.search_xml_files(ctx.clone());
-                }
-            }
-
-            if ui.button("📂 選擇目錄").clicked() {
-                if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                    self.search_path = path.display().to_string();
-                    self.last_search_path = self.search_path.clone();
-                    if !self.tag_name.is_empty() {
-                        self.search_xml_files(ctx.clone());
-                    }
-                }
-            }
+            // 檢測輸入變化 - 設為唯讀
+            ui.add_enabled(false, egui::TextEdit::singleline(&mut self.search_path));
 
             // 狀態訊息
             if !self.status_message.is_empty() {
