@@ -235,7 +235,6 @@ impl DefBrowserTab {
 
 fn parse_defs_from_file(path: &Path) -> Result<Vec<DefEntry>, Box<dyn std::error::Error>> {
     let content = fs::read_to_string(path)?;
-    let bytes = content.as_bytes();
     let mut reader = Reader::from_str(&content);
     reader.config_mut().trim_text(true);
 
@@ -243,13 +242,13 @@ fn parse_defs_from_file(path: &Path) -> Result<Vec<DefEntry>, Box<dyn std::error
     let mut buf = Vec::new();
     let mut current_def_type: Option<String> = None;
     let mut current_def_name: Option<String> = None;
-    let mut def_start_pos: usize = 0;
     let mut def_depth = 0;
     let mut inside_defs = false;
     let mut inside_defname = false;
+    let mut xml_parts: Vec<String> = Vec::new();
+    let mut capturing = false;
 
     loop {
-        let event_pos = reader.buffer_position() as usize;
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) => {
                 let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
@@ -257,22 +256,83 @@ fn parse_defs_from_file(path: &Path) -> Result<Vec<DefEntry>, Box<dyn std::error
                 if name == "Defs" {
                     inside_defs = true;
                 } else if inside_defs && def_depth == 0 && name.ends_with("Def") {
-                    // 開始一個新的 Def，記錄起始位置
+                    // 開始一個新的 Def
                     current_def_type = Some(name.clone());
                     current_def_name = None;
-                    def_start_pos = event_pos;
                     def_depth = 1;
+                    xml_parts.clear();
+                    capturing = true;
+                    
+                    // 記錄開始標籤
+                    let attrs: Vec<String> = e.attributes()
+                        .filter_map(|a| a.ok())
+                        .map(|attr| {
+                            format!("{}=\"{}\"",
+                                String::from_utf8_lossy(attr.key.as_ref()),
+                                String::from_utf8_lossy(&attr.value))
+                        })
+                        .collect();
+                    
+                    if attrs.is_empty() {
+                        xml_parts.push(format!("<{}>", name));
+                    } else {
+                        xml_parts.push(format!("<{} {}>", name, attrs.join(" ")));
+                    }
                 } else if def_depth > 0 {
                     if name == "defName" {
                         inside_defname = true;
                     }
                     def_depth += 1;
+                    
+                    if capturing {
+                        let attrs: Vec<String> = e.attributes()
+                            .filter_map(|a| a.ok())
+                            .map(|attr| {
+                                format!("{}=\"{}\"",
+                                    String::from_utf8_lossy(attr.key.as_ref()),
+                                    String::from_utf8_lossy(&attr.value))
+                            })
+                            .collect();
+                        
+                        if attrs.is_empty() {
+                            xml_parts.push(format!("<{}>", name));
+                        } else {
+                            xml_parts.push(format!("<{} {}>", name, attrs.join(" ")));
+                        }
+                    }
+                }
+            }
+            Ok(Event::Empty(ref e)) => {
+                if capturing && def_depth > 0 {
+                    let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                    let attrs: Vec<String> = e.attributes()
+                        .filter_map(|a| a.ok())
+                        .map(|attr| {
+                            format!("{}=\"{}\"",
+                                String::from_utf8_lossy(attr.key.as_ref()),
+                                String::from_utf8_lossy(&attr.value))
+                        })
+                        .collect();
+                    
+                    if attrs.is_empty() {
+                        xml_parts.push(format!("<{} />", name));
+                    } else {
+                        xml_parts.push(format!("<{} {} />", name, attrs.join(" ")));
+                    }
                 }
             }
             Ok(Event::Text(e)) => {
                 if inside_defname {
                     if let Ok(text) = e.unescape() {
                         current_def_name = Some(text.trim().to_string());
+                    }
+                }
+                if capturing {
+                    if let Ok(text) = e.unescape() {
+                        let trimmed = text.trim();
+                        if !trimmed.is_empty() {
+                            xml_parts.push(trimmed.to_string());
+                        }
                     }
                 }
             }
@@ -284,30 +344,27 @@ fn parse_defs_from_file(path: &Path) -> Result<Vec<DefEntry>, Box<dyn std::error
                 }
 
                 if def_depth > 0 {
+                    if capturing {
+                        xml_parts.push(format!("</{}>", name));
+                    }
+                    
                     def_depth -= 1;
 
-                    if def_depth == 0 {
-                        // Def 結束，記錄結束位置並提取 XML 內容
-                        let def_end_pos = reader.buffer_position() as usize;
-
+                    if def_depth == 0 && name.ends_with("Def") {
+                        // Def 結束
                         if let (Some(def_type), Some(def_name)) =
                             (&current_def_type, &current_def_name)
                         {
-                            // 提取從 def_start_pos 到 def_end_pos 的內容
-                            if def_start_pos < bytes.len() && def_end_pos <= bytes.len() {
-                                let xml_slice: &[u8] = &bytes[def_start_pos..def_end_pos];
-                                if let Ok(xml_content) = String::from_utf8(xml_slice.to_vec()) {
-                                    entries.push(DefEntry {
-                                        def_name: def_name.clone(),
-                                        file_path: path.to_path_buf(),
-                                        xml_content: format_xml(&xml_content),
-                                        def_type: def_type.clone(),
-                                    });
-                                }
-                            }
+                            entries.push(DefEntry {
+                                def_name: def_name.clone(),
+                                file_path: path.to_path_buf(),
+                                xml_content: format_xml(&xml_parts.join("")),
+                                def_type: def_type.clone(),
+                            });
                         }
                         current_def_type = None;
                         current_def_name = None;
+                        capturing = false;
                     }
                 }
 
@@ -326,13 +383,99 @@ fn parse_defs_from_file(path: &Path) -> Result<Vec<DefEntry>, Box<dyn std::error
     Ok(entries)
 }
 
-// 簡單格式化 XML 使其更易讀，保留縮排結構
+// 簡單格式化 XML 使其更易讀
 fn format_xml(xml: &str) -> String {
-    xml.lines()
-        .map(|line| line.trim_end()) // 只移除行尾空白
-        .filter(|line| !line.trim().is_empty()) // 過濾空行
-        .collect::<Vec<_>>()
-        .join("\n")
+    let mut result = String::new();
+    let mut indent_level = 0;
+    let mut chars = xml.chars().peekable();
+    let mut after_text = false; // 追蹤是否剛輸出了文本內容
+    
+    while let Some(ch) = chars.next() {
+        if ch == '<' {
+            // 收集完整的標籤
+            let mut tag = String::from('<');
+            let mut is_closing = false;
+            let mut is_self_closing = false;
+            
+            // 檢查是否是結束標籤
+            if chars.peek() == Some(&'/') {
+                is_closing = true;
+            }
+            
+            // 收集標籤內容
+            while let Some(&next_ch) = chars.peek() {
+                tag.push(chars.next().unwrap());
+                if next_ch == '>' {
+                    // 檢查是否是自閉合標籤
+                    if tag.ends_with("/>") {
+                        is_self_closing = true;
+                    }
+                    break;
+                }
+            }
+            
+            // 輸出標籤
+            if is_closing {
+                // 結束標籤
+                if after_text {
+                    // 如果前面有文本內容，標籤直接跟在後面（同一行）
+                    result.push_str(&tag);
+                    result.push('\n');
+                    after_text = false;
+                } else {
+                    // 否則，先減少縮排再輸出
+                    if indent_level > 0 {
+                        indent_level -= 1;
+                    }
+                    result.push_str(&"  ".repeat(indent_level));
+                    result.push_str(&tag);
+                    result.push('\n');
+                }
+            } else if is_self_closing {
+                // 自閉合標籤
+                result.push_str(&"  ".repeat(indent_level));
+                result.push_str(&tag);
+                result.push('\n');
+                after_text = false;
+            } else {
+                // 開始標籤
+                result.push_str(&"  ".repeat(indent_level));
+                result.push_str(&tag);
+                
+                // 檢查下一個字符是否是文本內容（不是 '<'）
+                if let Some(&next_ch) = chars.peek() {
+                    if next_ch != '<' {
+                        // 收集文本內容直到下一個標籤
+                        let mut text = String::new();
+                        while let Some(&ch) = chars.peek() {
+                            if ch == '<' {
+                                break;
+                            }
+                            text.push(chars.next().unwrap());
+                        }
+                        
+                        let trimmed = text.trim();
+                        if !trimmed.is_empty() {
+                            result.push_str(trimmed);
+                            after_text = true;
+                        }
+                        // 文本後不增加縮排，因為下一個應該是結束標籤
+                    } else {
+                        // 下一個是標籤，換行並增加縮排
+                        result.push('\n');
+                        indent_level += 1;
+                        after_text = false;
+                    }
+                } else {
+                    result.push('\n');
+                    indent_level += 1;
+                    after_text = false;
+                }
+            }
+        }
+    }
+    
+    result
 }
 
 // 使用系統預設程式打開檔案
