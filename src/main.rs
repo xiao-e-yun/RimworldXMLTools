@@ -108,9 +108,9 @@ impl eframe::App for XmlToolsApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
-                ui.selectable_value(&mut self.active_tab, 0, "🔍 標籤查找器");
-                ui.selectable_value(&mut self.active_tab, 1, "📚 Def 瀏覽器");
-                ui.selectable_value(&mut self.active_tab, 2, "🔗 展開繼承");
+                ui.selectable_value(&mut self.active_tab, 0, "📚 Def 瀏覽器");
+                ui.selectable_value(&mut self.active_tab, 1, "🔗 展開繼承");
+                ui.selectable_value(&mut self.active_tab, 2, "🔍 標籤查找器");
                 // 未來可以添加更多分頁
                 // ui.selectable_value(&mut self.active_tab, 3, "📊 統計分析");
                 // ui.selectable_value(&mut self.active_tab, 4, "🔧 工具箱");
@@ -119,9 +119,9 @@ impl eframe::App for XmlToolsApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             match self.active_tab {
-                0 => self.finder.ui(ui, ctx),
-                1 => self.browser.ui(ui, ctx),
-                2 => self.inheritance.ui(ui, ctx),
+                0 => self.browser.ui(ui, ctx),
+                1 => self.inheritance.ui(ui, ctx),
+                2 => self.finder.ui(ui, ctx),
                 // 未來可以添加更多分頁處理
                 // 3 => self.statistics.ui(ui, ctx),
                 // 4 => self.toolbox.ui(ui, ctx),
