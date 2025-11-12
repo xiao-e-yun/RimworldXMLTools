@@ -92,20 +92,6 @@ impl InheritanceTab {
 
         ui.separator();
 
-        // 搜尋欄
-        ui.horizontal(|ui| {
-            ui.label("🔍 搜尋 DefName:");
-            let response = ui.text_edit_singleline(&mut self.search_query);
-            
-            if response.changed() {
-                self.selected_def_name = String::new();
-                self.expanded_xml = String::new();
-                self.inheritance_chain.clear();
-            }
-        });
-
-        ui.separator();
-
         // 主要內容區域
         ui.horizontal_top(|ui| {
             // 左側: Def 列表
@@ -113,8 +99,15 @@ impl InheritanceTab {
                 egui::vec2(250.0, ui.available_height()),
                 egui::Layout::top_down(egui::Align::Min),
                 |ui| {
-                    ui.heading("Def 列表");
-                    ui.separator();
+                    ui.horizontal(|ui| {
+                        ui.label("🔍");
+                        let response = ui.text_edit_singleline(&mut self.search_query);
+                        if response.changed() {
+                            self.selected_def_name = String::new();
+                            self.expanded_xml = String::new();
+                            self.inheritance_chain.clear();
+                        }
+                    });
 
                     egui::ScrollArea::vertical()
                         .id_salt("def_list")
