@@ -1,0 +1,17 @@
+[package]
+name = "rimworld-xml-tag-finder"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = { version = "0.29" }
+egui = "0.29"
+quick-xml = "0.36"
+walkdir = "2.5"
+rfd = "0.15"
+rayon = "1.10"
+anyhow = "1.0.100"
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
+ico = "0.3.0"
+winresource = "0.1.17"
