@@ -129,8 +129,6 @@ impl InheritanceTab {
                 egui::Layout::top_down(egui::Align::Min),
                 |ui| {
                     if !self.selected_def_name.is_empty() {
-                        ui.heading(&self.selected_def_name);
-                        ui.separator();
 
                         // 顯示繼承鏈
                         if !self.inheritance_chain.is_empty() {
@@ -147,15 +145,15 @@ impl InheritanceTab {
                         }
 
                         // 顯示展開後的 XML
-                        ui.label("📄 展開的 XML:");
+                        ui.horizontal(|ui| {
+                            ui.label("📄 展開的 XML:");
                         
-                        // 複製按鈕
-                        if ui.button("📋 複製 XML").clicked() {
-                            ui.output_mut(|o| o.copied_text = self.expanded_xml.clone());
-                        }
-                        
-                        ui.separator();
-
+                            // 複製按鈕
+                            if ui.button("📋 複製 XML").clicked() {
+                                ui.output_mut(|o| o.copied_text = self.expanded_xml.clone());
+                            }
+                        });
+                    
                         egui::ScrollArea::vertical()
                             .id_salt("expanded_xml")
                             .show(ui, |ui| {
@@ -482,7 +480,7 @@ fn generate_expanded_xml(
     // 生成所有其他節點
     for (_, node) in nodes {
         if node.tag != "defName" {
-            generate_node_xml(&mut xml, node, 2);
+            generate_node_xml(&mut xml, node, 1);
         }
     }
     
