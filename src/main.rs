@@ -1,12 +1,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod tag_finder;
 mod xml_parser;
-mod def_browser;
+mod browser;
+mod finder;
+mod inheritance;
 
 use eframe::egui;
-use tag_finder::TagFinderTab;
-use def_browser::DefBrowserTab;
+use finder::TagFinderTab;
+use browser::DefBrowserTab;
+use inheritance::InheritanceTab;
 
 fn main() -> eframe::Result {
     // 載入圖標
@@ -96,8 +98,9 @@ fn setup_custom_fonts(ctx: &egui::Context) {
 
 #[derive(Default)]
 struct XmlToolsApp {
-    tag_finder: TagFinderTab,
-    def_browser: DefBrowserTab,
+    finder: TagFinderTab,
+    browser: DefBrowserTab,
+    inheritance: InheritanceTab,
     active_tab: usize,
 }
 
@@ -107,19 +110,21 @@ impl eframe::App for XmlToolsApp {
             egui::menu::bar(ui, |ui| {
                 ui.selectable_value(&mut self.active_tab, 0, "🔍 標籤查找器");
                 ui.selectable_value(&mut self.active_tab, 1, "📚 Def 瀏覽器");
+                ui.selectable_value(&mut self.active_tab, 2, "🔗 展開繼承");
                 // 未來可以添加更多分頁
-                // ui.selectable_value(&mut self.active_tab, 2, "📊 統計分析");
-                // ui.selectable_value(&mut self.active_tab, 3, "🔧 工具箱");
+                // ui.selectable_value(&mut self.active_tab, 3, "📊 統計分析");
+                // ui.selectable_value(&mut self.active_tab, 4, "🔧 工具箱");
             });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
             match self.active_tab {
-                0 => self.tag_finder.ui(ui, ctx),
-                1 => self.def_browser.ui(ui, ctx),
+                0 => self.finder.ui(ui, ctx),
+                1 => self.browser.ui(ui, ctx),
+                2 => self.inheritance.ui(ui, ctx),
                 // 未來可以添加更多分頁處理
-                // 2 => self.statistics.ui(ui, ctx),
-                // 3 => self.toolbox.ui(ui, ctx),
+                // 3 => self.statistics.ui(ui, ctx),
+                // 4 => self.toolbox.ui(ui, ctx),
                 _ => {
                     ui.heading("未實現的功能");
                 }
