@@ -127,15 +127,47 @@ impl TagFinderTab {
         // 檢查後台搜尋結果
         self.check_search_results();
 
-        ui.heading("XML 標籤查找器");
-        ui.add_space(10.0);
-
-        // 標籤名稱輸入
+        // 頂部控制面板
         ui.horizontal(|ui| {
-            ui.label("標籤名稱:");
-            let response = ui
-                .text_edit_singleline(&mut self.tag_name)
-                .on_hover_text("例如: stuffCategories, thingClass");
+            ui.label("目錄:");
+            
+            // 檢測輸入變化
+            let response = ui.text_edit_singleline(&mut self.search_path);
+            if response.changed() && self.search_path != self.last_search_path {
+                self.last_search_path = self.search_path.clone();
+                if !self.tag_name.is_empty() && !self.search_path.is_empty() {
+                    self.search_xml_files(ctx.clone());
+                }
+            }
+
+            if ui.button("📂 選擇目錄").clicked() {
+                if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                    self.search_path = path.display().to_string();
+                    self.last_search_path = self.search_path.clone();
+                    if !self.tag_name.is_empty() {
+                        self.search_xml_files(ctx.clone());
+                    }
+                }
+            }
+
+            // 狀態訊息
+            if !self.status_message.is_empty() {
+                ui.colored_label(
+                    if self.is_searching {
+                        egui::Color32::from_rgb(255, 165, 0)
+                    } else {
+                        egui::Color32::from_rgb(0, 200, 0)
+                    },
+                    &self.status_message,
+                );
+            }
+        });
+
+        ui.separator();
+
+        ui.horizontal(|ui| {
+            ui.label("🔍 搜尋 標籤名稱:");
+            let response = ui.text_edit_singleline(&mut self.tag_name);
 
             // 檢測輸入變化
             if response.changed() && self.tag_name != self.last_tag_name {
@@ -145,62 +177,21 @@ impl TagFinderTab {
                 }
             }
         });
+        
+        ui.separator();
 
-        ui.add_space(5.0);
-
-        // 搜尋路徑輸入
-        ui.horizontal(|ui| {
-            ui.label("搜尋路徑:");
-            let response = ui.text_edit_singleline(&mut self.search_path);
-
-            // 檢測輸入變化
-            if response.changed() && self.search_path != self.last_search_path {
-                self.last_search_path = self.search_path.clone();
-                if !self.tag_name.is_empty() && !self.search_path.is_empty() {
-                    self.search_xml_files(ctx.clone());
-                }
-            }
-
-            if ui.button("瀏覽...").clicked() {
-                if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                    self.search_path = path.display().to_string();
-                    self.last_search_path = self.search_path.clone();
-                    if !self.tag_name.is_empty() {
-                        self.search_xml_files(ctx.clone());
-                    }
-                }
-            }
-        });
-
-        ui.add_space(10.0);
-
-        // 手動搜尋按鈕
-        if ui
-            .add_enabled(!self.is_searching, egui::Button::new("🔍 重新搜尋"))
-            .clicked()
-        {
-            self.search_xml_files(ctx.clone());
-        }
-
-        ui.add_space(10.0);
-
-        // 狀態訊息
-        if !self.status_message.is_empty() {
-            if self.is_searching {
-                ui.horizontal(|ui| {
-                    ui.spinner();
-                    ui.label(&self.status_message);
-                });
-            } else {
-                ui.label(&self.status_message);
-            }
-            ui.add_space(5.0);
-        }
-
-        // 結果顯示（逗號分隔格式）
+        // 結果顯示區域
         if !self.results.is_empty() {
+            // 複製按鈕
+            ui.horizontal(|ui| {
+                ui.label(format!("找到 {} 個唯一值:", self.results.len()));
+                
+                if ui.button("📋 複製結果").clicked() {
+                    ui.output_mut(|o| o.copied_text = self.results.join(", "));
+                }
+            });
+
             ui.separator();
-            ui.add_space(5.0);
 
             // 限制顯示前 50 項
             const MAX_DISPLAY: usize = 50;
@@ -216,32 +207,18 @@ impl TagFinderTab {
                 display_results.join(", ")
             };
 
-            // 完整的結果（用於複製）
-            let full_results = self.results.join(", ");
-
-            // 複製按鈕
-            ui.horizontal(|ui| {
-                if ui.button("📋 複製結果").clicked() {
-                    ui.output_mut(|o| o.copied_text = full_results.clone());
-                }
-
-                if self.results.len() > MAX_DISPLAY {
-                    ui.label(format!(
-                        "（顯示前 {} 項，共 {} 項）",
-                        MAX_DISPLAY,
-                        self.results.len()
-                    ));
-                }
-            });
-
-            ui.add_space(5.0);
+            if self.results.len() > MAX_DISPLAY {
+                ui.label(format!("（顯示前 {} 項，共 {} 項）", MAX_DISPLAY, self.results.len()));
+            }
 
             // 顯示逗號分隔的結果
             egui::ScrollArea::vertical()
-                .max_height(400.0)
+                .id_salt("tag_results")
                 .show(ui, |ui| {
                     ui.label(&comma_separated);
                 });
+        } else if !self.is_searching && !self.status_message.is_empty() {
+            ui.label("沒有找到結果");
         }
     }
 }
