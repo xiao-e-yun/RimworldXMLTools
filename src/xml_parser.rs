@@ -8,6 +8,8 @@ pub fn extract_tag_values(
     path: &std::path::Path,
     tag_name: &str,
 ) -> Result<HashSet<String>, Box<dyn std::error::Error>> {
+    let tag_name = tag_name.trim().to_lowercase();
+
     let file = File::open(path)?;
     let file = BufReader::new(file);
     let mut reader = Reader::from_reader(file);
@@ -23,7 +25,7 @@ pub fn extract_tag_values(
             Ok(Event::Start(ref e)) => {
                 let name = e.name();
                 if let Ok(tag) = std::str::from_utf8(name.as_ref()) {
-                    if tag.to_lowercase() == tag_name.to_lowercase() {
+                    if tag.to_lowercase() == tag_name {
                         inside_target_tag = true;
                     } else if tag == "li" && inside_target_tag {
                         inside_li = true;
@@ -51,7 +53,7 @@ pub fn extract_tag_values(
             Ok(Event::End(ref e)) => {
                 let name = e.name();
                 if let Ok(tag) = std::str::from_utf8(name.as_ref()) {
-                    if tag == tag_name {
+                    if tag.to_lowercase() == tag_name {
                         inside_target_tag = false;
                     } else if tag == "li" {
                         inside_li = false;
