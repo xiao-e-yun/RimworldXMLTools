@@ -2674,7 +2674,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rimworld-xml-tag-finder"
+name = "rimworld-xml-tools"
 version = "0.1.0"
 dependencies = [
  "anyhow",
