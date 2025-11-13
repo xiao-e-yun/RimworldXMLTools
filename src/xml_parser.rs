@@ -23,7 +23,7 @@ pub fn extract_tag_values(
             Ok(Event::Start(ref e)) => {
                 let name = e.name();
                 if let Ok(tag) = std::str::from_utf8(name.as_ref()) {
-                    if tag == tag_name {
+                    if tag.to_lowercase() == tag_name.to_lowercase() {
                         inside_target_tag = true;
                     } else if tag == "li" && inside_target_tag {
                         inside_li = true;

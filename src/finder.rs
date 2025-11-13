@@ -214,8 +214,7 @@ impl TagFinderTab {
 
             ui.separator();
 
-            // 限制顯示前 50 項
-            const MAX_DISPLAY: usize = 50;
+            const MAX_DISPLAY: usize = 100;
             let display_results = if self.results.len() > MAX_DISPLAY {
                 &self.results[..MAX_DISPLAY]
             } else {
